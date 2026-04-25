@@ -241,6 +241,50 @@ void testGeneratorOutputParseability() {
     expect(result.processed_events == 120, "Generated file should replay cleanly");
 }
 
+void testVisualizationTraceExport() {
+    const std::vector<ReplayEvent> events = parseCsvFile("data/sample_orders.csv");
+    OrderBook book;
+
+    ReplayOptions options;
+    options.visualization_depth = 2;
+    options.visualization_frame_step = 3;
+
+    const ReplayResult result = replayEvents(events, book, options);
+    expect(result.visualization.depth == 2, "Visualization depth should be recorded");
+    expect(result.visualization.frame_step == 3, "Visualization frame step should be recorded");
+    expect(result.visualization.frames.size() == 3, "Expected sampled frames at events 3, 6, and 8");
+
+    const VisualizationFrame& first_frame = result.visualization.frames[0];
+    expect(first_frame.event_index == 2, "First sampled frame should be event index 2");
+    expect(first_frame.best_bid == 10050, "First sampled frame best bid mismatch");
+    expect(first_frame.best_ask == 10060, "First sampled frame best ask mismatch");
+    expect(first_frame.asks.size() == 2, "Expected two ask levels in first sampled frame");
+
+    const VisualizationFrame& second_frame = result.visualization.frames[1];
+    expect(second_frame.event_index == 5, "Second sampled frame should be event index 5");
+    expect(second_frame.trades.size() == 1, "Second sampled frame should include one trade");
+    expect(second_frame.matched_quantity == 20, "Second sampled frame matched quantity mismatch");
+    expect(second_frame.active_orders == 2, "Second sampled frame active order count mismatch");
+
+    const VisualizationFrame& final_frame = result.visualization.frames[2];
+    expect(final_frame.event_index == 7, "Final sampled frame should be the last event");
+    expect(final_frame.best_bid == 10065, "Final sampled frame best bid mismatch");
+    expect(final_frame.best_ask == 10070, "Final sampled frame best ask mismatch");
+    expect(final_frame.cumulative_traded_quantity == 210, "Cumulative traded quantity mismatch");
+
+    const std::filesystem::path temp_path = std::filesystem::temp_directory_path() / "lob_visualization_trace.json";
+    writeVisualizationJson(temp_path.string(), "sample_orders.csv", result);
+
+    std::ifstream input(temp_path);
+    expect(input.good(), "Visualization trace JSON should be readable");
+
+    const std::string contents((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    expect(contents.find("\"schemaVersion\": 1") != std::string::npos, "Visualization JSON schema version missing");
+    expect(contents.find("\"sourceName\": \"sample_orders.csv\"") != std::string::npos, "Visualization source missing");
+    expect(contents.find("\"capturedFrames\": 3") != std::string::npos, "Visualization captured frame count missing");
+    expect(contents.find("\"eventIndex\": 7") != std::string::npos, "Visualization final frame index missing");
+}
+
 void runTest(const std::string& name, void (*test_fn)()) {
     test_fn();
     std::cout << "[PASS] " << name << '\n';
@@ -264,6 +308,7 @@ int main() {
         runTest("TopKDepth", testTopKDepth);
         runTest("ReplayIntegration", testReplayIntegration);
         runTest("GeneratorOutputParseability", testGeneratorOutputParseability);
+        runTest("VisualizationTraceExport", testVisualizationTraceExport);
     } catch (const std::exception& exception) {
         std::cerr << "[FAIL] " << exception.what() << '\n';
         return 1;

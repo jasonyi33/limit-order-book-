@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Book Visualizer</title>
+    <meta
+        name="description"
+        content="Interactive visualization for replaying limit order book events, depth changes, and trade executions."
+    >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <div class="ambient ambient-a"></div>
+        <div class="ambient ambient-b"></div>
+
+        <header class="hero panel reveal">
+            <div class="hero-copy">
+                <span class="eyebrow">Static Demo</span>
+                <h1>Order book replay, with the mechanics made visible.</h1>
+                <p class="hero-text">
+                    Scrub through each event, inspect matched trades, and watch bid and ask depth reshape in real
+                    time from the same trace exported by the C++ matching engine.
+                </p>
+                <div class="hero-actions">
+                    <button id="load-sample" class="button button-primary" type="button">Load bundled sample</button>
+                    <label class="button button-secondary" for="trace-upload">Open local trace</label>
+                    <input id="trace-upload" type="file" accept=".json,application/json" hidden>
+                </div>
+                <p id="status-message" class="status-message">Loading bundled sample trace...</p>
+            </div>
+
+            <div class="hero-summary">
+                <div class="summary-card">
+                    <span class="summary-label">Dataset</span>
+                    <strong id="summary-source">Waiting for trace</strong>
+                    <span id="summary-frames" class="summary-meta">0 frames</span>
+                </div>
+                <div class="summary-grid">
+                    <article class="metric-card">
+                        <span class="metric-label">Processed</span>
+                        <strong id="metric-processed">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Trades</span>
+                        <strong id="metric-trades">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Final Spread</span>
+                        <strong id="metric-spread">N/A</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Runtime</span>
+                        <strong id="metric-runtime">0 ms</strong>
+                    </article>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <section class="panel control-panel reveal">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Playback</span>
+                        <h2>Step through the tape</h2>
+                    </div>
+                    <div class="legend">
+                        <span class="legend-item"><i class="legend-swatch bid"></i>Bid depth</span>
+                        <span class="legend-item"><i class="legend-swatch ask"></i>Ask depth</span>
+                        <span class="legend-item"><i class="legend-swatch fill"></i>Trade fill</span>
+                    </div>
+                </div>
+
+                <div class="dataset-strip">
+                    <div class="dataset-item">
+                        <span class="dataset-label">Frame</span>
+                        <strong id="frame-counter">0 / 0</strong>
+                    </div>
+                    <div class="dataset-item">
+                        <span class="dataset-label">Captured every</span>
+                        <strong id="frame-step">1 event</strong>
+                    </div>
+                    <div class="dataset-item">
+                        <span class="dataset-label">Depth per side</span>
+                        <strong id="depth-range">12 levels</strong>
+                    </div>
+                    <div class="dataset-item">
+                        <span class="dataset-label">Current timestamp</span>
+                        <strong id="timestamp-readout">0</strong>
+                    </div>
+                </div>
+
+                <label class="timeline-wrap" for="timeline">
+                    <span class="timeline-label">Event timeline</span>
+                    <input id="timeline" type="range" min="0" max="0" value="0" step="1">
+                </label>
+
+                <div class="transport">
+                    <div class="transport-buttons">
+                        <button id="step-back" class="button button-ghost" type="button" aria-label="Previous frame">
+                            Prev
+                        </button>
+                        <button id="play-toggle" class="button button-primary" type="button" aria-label="Play trace">
+                            Play
+                        </button>
+                        <button id="step-forward" class="button button-ghost" type="button" aria-label="Next frame">
+                            Next
+                        </button>
+                    </div>
+
+                    <label class="speed-select" for="speed-select">
+                        <span>Speed</span>
+                        <select id="speed-select">
+                            <option value="0.5">0.5x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="2">2x</option>
+                            <option value="4">4x</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
+
+            <section class="panel book-panel reveal">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Book View</span>
+                        <h2>Top-of-book depth ladder</h2>
+                    </div>
+                    <div class="mid-stack">
+                        <span class="mid-label">Midprice</span>
+                        <strong id="mid-price">N/A</strong>
+                        <span id="spread-chip" class="spread-chip">Spread: N/A</span>
+                    </div>
+                </div>
+
+                <div class="book-layout">
+                    <section class="book-side asks">
+                        <div class="side-header">
+                            <span>Asks</span>
+                            <span>Price / Qty</span>
+                        </div>
+                        <div id="ask-ladder" class="ladder"></div>
+                    </section>
+
+                    <div class="center-ribbon">
+                        <span class="ribbon-label">Market state</span>
+                        <strong id="state-headline">Waiting for trace</strong>
+                        <span id="state-subline">Load a trace to begin playback.</span>
+                    </div>
+
+                    <section class="book-side bids">
+                        <div class="side-header">
+                            <span>Bids</span>
+                            <span>Qty / Price</span>
+                        </div>
+                        <div id="bid-ladder" class="ladder"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section class="panel event-panel reveal">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Event Detail</span>
+                        <h2>Current instruction</h2>
+                    </div>
+                    <div id="event-badges" class="badge-row"></div>
+                </div>
+
+                <article class="event-card">
+                    <p id="event-headline" class="event-headline">No active frame</p>
+                    <p id="event-description" class="event-description">
+                        Load a trace and use the timeline to inspect each replayed event.
+                    </p>
+
+                    <dl class="event-metrics">
+                        <div>
+                            <dt>Latency</dt>
+                            <dd id="event-latency">0 ns</dd>
+                        </div>
+                        <div>
+                            <dt>Matched</dt>
+                            <dd id="event-matched">0</dd>
+                        </div>
+                        <div>
+                            <dt>Remaining</dt>
+                            <dd id="event-remaining">0</dd>
+                        </div>
+                        <div>
+                            <dt>Active Orders</dt>
+                            <dd id="event-active-orders">0</dd>
+                        </div>
+                    </dl>
+                </article>
+
+                <div class="trade-card">
+                    <div class="trade-card-header">
+                        <h3>Trades generated now</h3>
+                        <span id="trade-count">0 trades</span>
+                    </div>
+                    <div id="trade-list" class="trade-list"></div>
+                </div>
+            </section>
+
+            <section class="panel charts-panel reveal">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Replay Curves</span>
+                        <h2>Context across the full run</h2>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <article class="chart-card">
+                        <div class="chart-copy">
+                            <span class="chart-label">Spread</span>
+                            <strong id="spread-chart-value">N/A</strong>
+                            <p>Best ask minus best bid across captured frames.</p>
+                        </div>
+                        <svg id="spread-chart" class="sparkline" viewBox="0 0 300 120" preserveAspectRatio="none"></svg>
+                    </article>
+
+                    <article class="chart-card">
+                        <div class="chart-copy">
+                            <span class="chart-label">Cumulative Volume</span>
+                            <strong id="volume-chart-value">0</strong>
+                            <p>Total traded quantity accumulated during replay.</p>
+                        </div>
+                        <svg id="volume-chart" class="sparkline" viewBox="0 0 300 120" preserveAspectRatio="none"></svg>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Limit Order Book Matching Engine
 
-A C++17 limit order book and matching engine that simulates core exchange behavior, including limit orders, market orders, cancellations, price-time priority, trade execution, CSV market data replay, latency benchmarking, top-of-book depth queries, and deterministic synthetic order generation.
+A C++17 limit order book and matching engine that simulates core exchange behavior, including limit orders, market orders, cancellations, price-time priority, trade execution, CSV market data replay, latency benchmarking, top-of-book depth queries, deterministic synthetic order generation, and a static web visualizer for replay traces.
 
 The engine stores bids in descending price order and asks in ascending price order. Each price level keeps a FIFO queue of resting orders, and a hash-indexed order lookup table enables constant-time average cancellation without scanning the book.
 
@@ -10,6 +10,7 @@ The engine stores bids in descending price order and asks in ascending price ord
 - Market buy and sell orders that sweep the opposite side until filled or empty
 - O(1) average cancellation via `order_id -> list iterator` lookup
 - CSV replay CLI with optional trade export and final book printing
+- Visualization trace export plus a polished static web replay viewer in `docs/`
 - Benchmark mode with throughput, median, p95, p99, and max latency
 - Top-K bid/ask depth queries for interview-style book inspection
 - Deterministic synthetic order generator for larger benchmark streams
@@ -57,6 +58,7 @@ Where:
 ├── src/
 ├── tests/
 ├── data/
+├── docs/
 └── output/
 ```
 
@@ -93,11 +95,49 @@ Replay with latency benchmarking, book printing, and trade export:
 ./build/bin/lob --input data/sample_orders.csv --benchmark --print-book --trades output/trades.csv
 ```
 
+Export a browser-ready visualization trace:
+
+```bash
+./build/bin/lob --input data/sample_orders.csv --benchmark --visualize docs/data/sample_orders.trace.json --visualize-depth 12 --visualize-frame-step 1
+```
+
 Generate a larger synthetic dataset:
 
 ```bash
 ./build/bin/generator --events 100000 --output data/synthetic_orders.csv --cancel-prob 0.18 --market-prob 0.08 --volatility 12 --avg-size 75 --seed 4242
 ```
+
+## Web Visualizer
+
+The repo ships a static replay visualizer in `docs/` that consumes JSON traces exported by the C++ engine.
+
+Generate the bundled sample trace:
+
+```bash
+./build/bin/lob --input data/sample_orders.csv --benchmark --visualize docs/data/sample_orders.trace.json
+```
+
+Serve the repo locally and open the demo:
+
+```bash
+python3 -m http.server 4173
+```
+
+Then visit:
+
+```text
+http://127.0.0.1:4173/docs/
+```
+
+The visualizer includes:
+
+- Timeline scrubbing and autoplay controls
+- Mirrored bid/ask depth ladders with trade highlights
+- Event-by-event execution detail and trade tape
+- Spread and cumulative volume sparkline charts
+- Local trace upload for custom JSON exports
+
+The `docs/` folder is GitHub Pages-ready, so the same assets can be published directly from the repository when Pages is enabled.
 
 ## Example Input
 
