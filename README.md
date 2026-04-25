@@ -4,6 +4,8 @@ A C++17 limit order book and matching engine that simulates core exchange behavi
 
 The engine stores bids in descending price order and asks in ascending price order. Each price level keeps a FIFO queue of resting orders, and a hash-indexed order lookup table enables constant-time average cancellation without scanning the book.
 
+Live demo: https://jasonyi33.github.io/limit-order-book-/
+
 ## Features
 
 - Limit buy and sell order support with price-time priority matching
@@ -111,6 +113,12 @@ Generate a larger synthetic dataset:
 
 The repo ships a static replay visualizer in `docs/` that consumes JSON traces exported by the C++ engine.
 
+Live demo:
+
+```text
+https://jasonyi33.github.io/limit-order-book-/
+```
+
 Generate the bundled sample trace:
 
 ```bash
@@ -137,7 +145,7 @@ The visualizer includes:
 - Spread and cumulative volume sparkline charts
 - Local trace upload for custom JSON exports
 
-The `docs/` folder is GitHub Pages-ready, so the same assets can be published directly from the repository when Pages is enabled.
+The `docs/` folder is published with GitHub Pages from `main:/docs`, so the hosted demo and the local static preview use the same assets.
 
 ## Example Input
 
